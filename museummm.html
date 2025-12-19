@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>UUM Smart Museum Guide — All-in-one Prototype</title>
+
+  <style>
+    :root{
+      --accent:#0066cc; --bg:#f4f6f8; --card:#fff; --muted:#666;
+    }
+    *{box-sizing:border-box}
+    body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; margin:0; background:var(--bg); color:#111}
+    header{background:linear-gradient(90deg,var(--accent),#2a9bd6); color:#fff; padding:18px}
+    .wrap{max-width:1100px;margin:18px auto;padding:0 16px}
+    h1{margin:0;font-size:20px}
+    p.lead{margin:6px 0 0;font-size:13px;opacity:.95}
+
+    .layout{display:grid;grid-template-columns:260px 1fr;gap:18px;margin-top:18px}
+    @media (max-width:900px){.layout{grid-template-columns:1fr} .sidebar{order:2}}
+
+    .card{background:var(--card);padding:12px;border-radius:10px;box-shadow:0 6px 18px rgba(12,20,30,.06)}
+    .sidebar h4{margin:0 0 8px 0}
+    .segments-list{display:flex;flex-direction:column;gap:8px}
+    .seg-btn{padding:10px;border-radius:8px;border:0;background:transparent;text-align:left;cursor:pointer}
+    .seg-btn.active{background:linear-gradient(90deg,#e9f4ff,#f6fbff);border:1px solid rgba(0,102,204,.08)}
+
+    .controls{display:flex;gap:8px;align-items:center;margin-bottom:12px}
+    .search{flex:1}
+    input[type=search]{width:100%;padding:10px;border-radius:8px;border:1px solid #d9e2ea}
+    .badge{font-size:12px;color:var(--muted)}
+
+    .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+    .artifact{background:var(--card);padding:12px;border-radius:10px;display:flex;gap:12px;align-items:flex-start;flex-direction:column}
+    .thumb{width:100%;height:140px;border-radius:8px;flex-shrink:0;background:#e6eef8;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--muted)}
+    .meta h3{margin:0;font-size:16px}
+    .meta p{margin:6px 0 0;font-size:13px;color:var(--muted)}
+    .meta .row{display:flex;gap:8px;align-items:center;margin-top:8px}
+    button.play{background:var(--accent);color:#fff;border:0;padding:8px 10px;border-radius:8px;cursor:pointer}
+    button.more{background:transparent;border:1px solid #d9e2ea;padding:7px 10px;border-radius:8px;cursor:pointer}
+    button.fav{background:#fff;border:1px solid #ffd; padding:7px 10px;border-radius:8px;cursor:pointer}
+
+    footer{padding:18px;text-align:center;color:var(--muted);font-size:13px}
+
+    /* modal */
+    .modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(11,18,25,.45);padding:18px}
+    .modal.active{display:flex}
+    .dialog{background:#fff;padding:16px;border-radius:10px;max-width:820px;width:100%;box-shadow:0 20px 60px rgba(12,20,30,.4)}
+    .dialog header{display:flex;justify-content:space-between;align-items:center}
+    .close{background:transparent;border:0;font-size:18px;cursor:pointer}
+    .muted{color:var(--muted)}
+    .hidden{display:none}
+
+    /* small */
+    .top-row{display:flex;gap:12px;align-items:center;justify-content:space-between}
+    .back-btn{background:#007f5f;color:#fff;padding:8px 12px;border-radius:8px;border:0;cursor:pointer}
+    @media (max-width:500px){ .thumb{height:120px} .layout{gap:12px} }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <h1>UUM Smart Museum Guide</h1>
+      <p class="lead">Pilih segmen pameran — tekan artifak untuk dengar ringkasan audio. Tekan «Baca Lagi» untuk maklumat penuh.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="layout">
+      <!-- SIDEBAR: Segmen -->
+      <aside class="sidebar">
+        <div class="card">
+          <h4>Segmen Pameran</h4>
+          <nav class="segments-list" id="segments"></nav>
+          <hr style="margin:10px 0">
+          <div class="muted" style="font-size:13px">Tip: buka pada telefon & guna headphone untuk pengalaman terbaik.</div>
+          <div style="margin-top:10px"><button id="show-favs" class="back-btn" style="background:#005a9c">Tunjuk Simpanan</button></div>
+        </div>
+      </aside>
+
+      <!-- MAIN -->
+      <section>
+        <div class="card">
+          <div class="top-row" style="margin-bottom:12px">
+            <div style="flex:1">
+              <input id="search" type="search" placeholder="Cari artifak atau kata kunci..." />
+            </div>
+            <div style="width:180px;text-align:right"><span class="badge">Bil artifak: <strong id="count">0</strong></span></div>
+          </div>
+
+          <div id="list" class="grid"></div>
+        </div>
+
+        <footer style="margin-top:12px">
+          <p>Prototype UUM Museum Guide — gantikan gambar/audio dengan aset sebenar.</p>
+        </footer>
+      </section>
+    </div>
+  </main>
+
+  <!-- Modal Read More -->
+  <div id="modal" class="modal" role="dialog" aria-hidden="true">
+    <div class="dialog" role="document">
+      <header>
+        <div>
+          <strong id="m-title">Tajuk</strong>
+          <div class="muted" id="m-sub">Segmen</div>
+        </div>
+        <div><button id="m-close" class="close">✕</button></div>
+      </header>
+
+      <div style="margin-top:12px">
+        <p id="m-desc">Penerangan penuh..</p>
+        <div style="margin-top:12px">
+          <audio id="m-audio" controls preload="none"><source id="m-audio-src" src="" type="audio/mpeg">Browser anda tidak menyokong audio.</audio>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shared audio element for quick play (hidden) -->
+  <audio id="shared-player" preload="none" class="hidden"></audio>
+
+  <script>
+    /* ======= SAMPLE DATA (ubah ikut keperluan) ======= */
+    const DATA = [
+      { id:'sejarah', title:'Sejarah UUM', artifacts:[
+        { id:'s1', title:'Bendera Lama', thumb:'', short:'Bendera rasmi UUM (tahun 1990).', audio:'audio/sejarah1.mp3', desc:'Bendera ini digunakan semasa majlis penting... (penerangan penuh).' },
+        { id:'s2', title:'Piala Warisan', thumb:'', short:'Piala anugerah universiti.', audio:'audio/sejarah2.mp3', desc:'Piala ini dianugerahkan kerana...' }
+      ]},
+      { id:'budaya', title:'Budaya & Warisan', artifacts:[
+        { id:'b1', title:'Ukiran Tradisi', thumb:'', short:'Koleksi ukiran tradisional Melayu.', audio:'audio/budaya1.mp3', desc:'Ukiran ini melambangkan...' },
+        { id:'b2', title:'Pakaian Tradisional', thumb:'', short:'Pakaian tradisi pelbagai negeri.', audio:'audio/budaya2.mp3', desc:'Pakaian ini dipakai semasa...' }
+      ]},
+      { id:'inovasi', title:'Inovasi & Teknologi', artifacts:[
+        { id:'i1', title:'Projek Hijau Pelajar', thumb:'', short:'Sistem tenaga boleh diperbaharui mini.', audio:'audio/inovasi1.mp3', desc:'Projek ini direka untuk...' },
+        { id:'i2', title:'Aplikasi Pengurusan', thumb:'', short:'Aplikasi yang dibangunkan fakulti.', audio:'audio/inovasi2.mp3', desc:'Aplikasi ini membantu...' }
+      ]},
+      { id:'tokoh', title:'Tokoh & Alumni', artifacts:[
+        { id:'t1', title:'Dr. Ahmad', thumb:'', short:'Pengasas program pengurusan.', audio:'audio/tokoh1.mp3', desc:'Dr Ahmad merupakan tokoh...' },
+        { id:'t2', title:'Alumni Cemerlang', thumb:'', short:'Kisah alumni berjaya.', audio:'audio/tokoh2.mp3', desc:'Beliau telah...' }
+      ]}
+    ];
+
+    /* ======= STATE ======= */
+    let activeSeg = DATA[0].id;
+    const segRoot = document.getElementById('segments');
+    const listRoot = document.getElementById('list');
+    const countEl = document.getElementById('count');
+    const searchEl = document.getElementById('search');
+    const sharedPlayer = document.getElementById('shared-player');
+
+    /* FAVORITES (localStorage) */
+    const FAV_KEY = 'uum_favs';
+    function loadFavs(){ try{ return JSON.parse(localStorage.getItem(FAV_KEY) || '[]'); }catch(e){return []} }
+    function saveFavs(arr){ localStorage.setItem(FAV_KEY, JSON.stringify(arr)); }
+    function isFav(id){ return loadFavs().includes(id) }
+    function toggleFav(id){
+      const arr = loadFavs();
+      const idx = arr.indexOf(id);
+      if(idx===-1) arr.push(id); else arr.splice(idx,1);
+      saveFavs(arr);
+      renderList();
+    }
+
+    /* RENDER SEGMENTS (sidebar) */
+    function renderSegments(){
+      segRoot.innerHTML = '';
+      DATA.forEach(seg=>{
+        const btn = document.createElement('button');
+        btn.className = 'seg-btn' + (seg.id===activeSeg ? ' active' : '');
+        btn.textContent = seg.title;
+        btn.onclick = ()=>{ activeSeg = seg.id; renderSegments(); renderList(); searchEl.value=''; }
+        segRoot.appendChild(btn);
+      });
+    }
+
+    /* RENDER ARTIFACT LIST (for active segment) */
+    function renderList(){
+      listRoot.innerHTML = '';
+      const seg = DATA.find(s=>s.id===activeSeg);
+      const q = searchEl.value.trim().toLowerCase();
+      const items = seg.artifacts.filter(a => a.title.toLowerCase().includes(q) || a.short.toLowerCase().includes(q) || a.desc.toLowerCase().includes(q));
+      countEl.textContent = items.length;
+
+      if(items.length===0){
+        listRoot.innerHTML = '<div style="grid-column:1/-1;padding:20px;text-align:center;color:var(--muted)">Tiada artifak ditemui.</div>';
+        return;
+      }
+
+      items.forEach(it=>{
+        const card = document.createElement('div');
+        card.className = 'artifact';
+        card.innerHTML = `
+          <div style="width:100%">
+            <div class="thumb">${it.title}</div>
+            <div class="meta">
+              <h3>${it.title}</h3>
+              <p class="muted">${it.short}</p>
+              <div class="row">
+                <button class="play" data-audio="${it.audio}">Mainkan Audio</button>
+                <button class="more" data-id="${it.id}">Baca Lagi</button>
+                <button class="fav" data-id="${it.id}">${isFav(it.id)?'✔ Simpan':'✚ Simpan'}</button>
+              </div>
+            </div>
+          </div>
+        `;
+        listRoot.appendChild(card);
+      });
+    }
+
+    /* PLAY AUDIO: use one shared player so only one plays at a time */
+    document.addEventListener('click', e=>{
+      const p = e.target.closest('button.play');
+      if(p){
+        const src = p.dataset.audio;
+        if(!src){ alert('Audio tidak ditemui. Tukar pautan dalam DATA.'); return; }
+        if(sharedPlayer.src !== src){
+          sharedPlayer.src = src;
+        }
+        sharedPlayer.play();
+      }
+
+      const m = e.target.closest('button.more');
+      if(m){
+        const id = m.dataset.id;
+        openModal(id);
+      }
+
+      const f = e.target.closest('button.fav');
+      if(f){
+        const id = f.dataset.id;
+        toggleFav(id);
+      }
+    });
+
+    /* MODAL read-more */
+    const modal = document.getElementById('modal');
+    const mTitle = document.getElementById('m-title');
+    const mSub = document.getElementById('m-sub');
+    const mDesc = document.getElementById('m-desc');
+    const mAudioSrc = document.getElementById('m-audio-src');
+    const mAudio = document.getElementById('m-audio');
+    const mClose = document.getElementById('m-close');
+
+    function findArtifactById(id){
+      for(const s of DATA) for(const a of s.artifacts) if(a.id===id) return { segTitle: s.title, item: a };
+      return null;
+    }
+
+    function openModal(id){
+      const found = findArtifactById(id);
+      if(!found) return alert('Artifak tidak ditemui.');
+      mTitle.textContent = found.item.title;
+      mSub.textContent = found.segTitle;
+      mDesc.textContent = found.item.desc;
+      mAudioSrc.src = found.item.audio || '';
+      mAudio.load();
+      modal.classList.add('active');
+      modal.setAttribute('aria-hidden','false');
+    }
+
+    mClose.onclick = ()=>{ modal.classList.remove('active'); modal.setAttribute('aria-hidden','true'); mAudio.pause(); }
+    modal.addEventListener('click', e=>{ if(e.target===modal) { modal.classList.remove('active'); modal.setAttribute('aria-hidden','true'); mAudio.pause(); } });
+
+    /* SEARCH */
+    searchEl.addEventListener('input', ()=> renderList());
+
+    /* SHOW FAVORITES list */
+    document.getElementById('show-favs').addEventListener('click', ()=>{
+      const favs = loadFavs();
+      if(favs.length===0) return alert('Tiada artifak disimpan.');
+      // build temporary view: show favorites grouped by segment
+      const favItems = [];
+      for(const id of favs){
+        const f = findArtifactById(id);
+        if(f) favItems.push({seg:f.segTitle, item:f.item});
+      }
+      // render
+      listRoot.innerHTML = '';
+      countEl.textContent = favItems.length;
+      favItems.forEach(fi=>{
+        const it = fi.item;
+        const card = document.createElement('div');
+        card.className = 'artifact';
+        card.innerHTML = `
+          <div style="width:100%">
+            <div class="thumb">${it.title}</div>
+            <div class="meta">
+              <h3>${it.title}</h3>
+              <p class="muted">${fi.seg} — ${it.short}</p>
+              <div class="row">
+                <button class="play" data-audio="${it.audio}">Mainkan Audio</button>
+                <button class="more" data-id="${it.id}">Baca Lagi</button>
+                <button class="fav" data-id="${it.id}">${isFav(it.id)?'✔ Simpan':'✚ Simpan'}</button>
+              </div>
+            </div>
+          </div>
+        `;
+        listRoot.appendChild(card);
+      });
+    });
+
+    /* keyboard: numbers 1..4 switch segment */
+    document.addEventListener('keydown', e=>{
+      if(e.key>='1' && e.key<='9'){
+        const idx = Number(e.key)-1;
+        if(DATA[idx]){ activeSeg = DATA[idx].id; renderSegments(); renderList(); searchEl.value=''; }
+      }
+    });
+
+    /* initial render */
+    renderSegments();
+    renderList();
+
+    /* Accessibility: pause shared player when navigating away */
+    window.addEventListener('pagehide', ()=> sharedPlayer.pause());
+  </script>
+</body>
+</html>
